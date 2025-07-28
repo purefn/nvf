@@ -5,7 +5,7 @@
   ...
 }: let
   inherit (builtins) isList;
-  inherit (lib.types) either package listOf str;
+  inherit (lib.types) either nullOr package listOf str;
   inherit (lib.options) mkEnableOption mkOption;
   inherit (lib.strings) optionalString;
   inherit (lib.modules) mkIf mkMerge;
@@ -29,8 +29,8 @@ in {
       package = mkOption {
         description = "Haskell LSP package or command to run the Haskell LSP";
         example = ''[ (lib.getExe pkgs.haskellPackages.haskell-language-server) "--debug" ]'';
-        default = haskellPackages.haskell-language-server;
-        type = either package (listOf str);
+        default = null;
+        type = nullOr (either package (listOf str));
       };
     };
 
@@ -38,8 +38,8 @@ in {
       enable = mkEnableOption "DAP support for Haskell" // {default = config.vim.languages.enableDAP;};
       package = mkOption {
         description = "Haskell DAP package or command to run the Haskell DAP";
-        default = haskellPackages.haskell-debug-adapter;
-        type = either package (listOf str);
+        default = null;
+        type = nullOr (either package (listOf str));
       };
     };
   };
@@ -68,11 +68,13 @@ in {
                 },
               },
               hls = {
+                ${ optionalString (cfg.lsp.package != null) ''
                 cmd = ${
                 if isList cfg.lsp.package
                 then expToLua cfg.lsp.package
                 else ''{"${cfg.lsp.package}/bin/haskell-language-server-wrapper", "--lsp"}''
-              },
+                }
+                ''}
                 on_attach = function(client, bufnr, ht)
                   default_on_attach(client, bufnr, ht)
                   local opts = { noremap = true, silent = true, buffer = bufnr }
@@ -87,13 +89,12 @@ in {
                 end,
               },
             ''}
-            ${optionalString cfg.dap.enable ''
+            ${optionalString (cfg.dap.enable && cfg.dap.package != null) ''
               dap = {
                 cmd = ${
                 if isList cfg.dap.package
                 then expToLua cfg.dap.package
                 else ''{"${cfg.dap.package}/bin/haskell-debug-adapter"}''
-              },
               },
             ''}
             }
